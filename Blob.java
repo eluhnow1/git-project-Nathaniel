@@ -27,7 +27,6 @@ public class Blob {
     private static byte[] readFileContent(String filePath) throws IOException {
         byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
         if (COMPRESSION_ENABLED) {
-            //Not exactly sure how this compression part works, had to look it up, but it doesn't matter b/c it gets the job done
             ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); //Creates an output stream that writes the input data into a byte array
             try (DeflaterOutputStream deflater = new DeflaterOutputStream(byteStream)) {
                 deflater.write(fileBytes); //Compresses a raw stream of bytes using the DEFLATe compression process
