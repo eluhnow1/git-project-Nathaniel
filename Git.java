@@ -56,21 +56,27 @@ public class Git{
     private static boolean deletePath(String path) {
         try {
             Path targetPath = Paths.get(path);
+            //Case for nonexistent path
             if (Files.notExists(targetPath)) {
                 return false;
             }
-            //Recursively delete elements in the file tree
+            //If the path is a regular file, just deletes it
+            if (Files.isRegularFile(targetPath)) {
+                Files.delete(targetPath);
+                return true;
+            }
+            //Recursively deletes elements in the file tree
             Files.walkFileTree(targetPath, new SimpleFileVisitor<Path>() {
-                @Override
+                @Override //This is just used to help catch errors
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     Files.delete(file);
                     return FileVisitResult.CONTINUE;
-                }
+                }//This basically says, whenever you encounter a file while walking through the tree, delete it
                 @Override
                 public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
                     Files.delete(dir);
                     return FileVisitResult.CONTINUE;
-                }
+                }//Ensures that the now-empty directory is deleted
             });
             return true;
         } catch (IOException e) {

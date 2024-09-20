@@ -28,9 +28,9 @@ public class Blob {
         byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
         if (COMPRESSION_ENABLED) {
             //Not exactly sure how this compression part works, had to look it up, but it doesn't matter b/c it gets the job done
-            ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+            ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); //Creates an output stream that writes the input data into a byte array
             try (DeflaterOutputStream deflater = new DeflaterOutputStream(byteStream)) {
-                deflater.write(fileBytes);
+                deflater.write(fileBytes); //Compresses a raw stream of bytes using the DEFLATe compression process
             }
             return byteStream.toByteArray(); //Returns the compressed bytes
         }
@@ -59,9 +59,13 @@ public class Blob {
         try {
             Git.initGitRepo();
             resetTestFiles();
-
+            //Creates string with 10,000 a's
+            StringBuilder sb = new StringBuilder("");
+            for (int i=0; i<10000; i++) {
+                sb.append("a");
+            }
             System.out.println("Compression Enabled: " + COMPRESSION_ENABLED);
-            Files.write(Paths.get("example.txt"), "this is an example file...".getBytes(StandardCharsets.UTF_8));
+            Files.write(Paths.get("example.txt"), sb.toString().getBytes(StandardCharsets.UTF_8));
             createBlob("example.txt");
             System.out.println("Blob created successfully");
 
@@ -69,14 +73,33 @@ public class Blob {
             String officialSha1Hash = generateSha1("example.txt");
             boolean hashCreatedSuccessfully = Files.exists(Paths.get("git/objects", officialSha1Hash));
             boolean fileContentsCorrect = false;
+            boolean indexContentCorrect = false;
+            //Tests if the contents of the blob were copied correctly
             if (hashCreatedSuccessfully) {
                 byte[] blobContentBytes = Files.readAllBytes(Paths.get("git/objects", officialSha1Hash));
                 byte[] originalFileBytes = readFileContent("example.txt");
                 fileContentsCorrect = java.util.Arrays.equals(blobContentBytes, originalFileBytes);
             }
+            //Tests if the line in the index file is correctly formatted
+            for (String line : Files.readAllLines(Paths.get("git/index"))) {
+                System.out.println("Actual Index Line: " + line);
+                System.out.println("Expected Index Line: " + officialSha1Hash+" example.txt");
+                if (line.equals(officialSha1Hash+" example.txt")) {
+                    indexContentCorrect=true;
+                    break;
+                }
+            }
+            //Tests if compression works
+            if (COMPRESSION_ENABLED) {
+                byte[] blobContentBytes = Files.readAllBytes(Paths.get("git/objects", officialSha1Hash));
+                byte[] uncompressedBytes = Files.readAllBytes(Paths.get("example.txt"));
+                System.out.println("Original Size: " + uncompressedBytes.length);
+                System.out.println("Compressed Size: " + blobContentBytes.length);
+            }
 
             System.out.println("Hash created successfully: " + hashCreatedSuccessfully);
             System.out.println("File contents correct: " + fileContentsCorrect);
+            System.out.println("Index line Correct: " + indexContentCorrect);
 
             resetTestFiles();
         } catch (IOException | NoSuchAlgorithmException | ObjectsDirectoryNotFoundException e) {
@@ -97,7 +120,7 @@ public class Blob {
         Files.deleteIfExists(blobFile);
         System.out.println("Deleted blob file: " + blobFile.toString());
 
-        //Removes the corresponding line in the index file
+        //Removes the line in the index file
         Path indexFile = Paths.get("git/index");
         if (Files.exists(indexFile)) {
             String blobEntry = sha1Hash + " example.txt";
