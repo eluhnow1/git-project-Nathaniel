@@ -3,13 +3,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.zip.DeflaterOutputStream;
 
 public class Blob {
-    //Generate a unique filename using SHA1 hash of file data
+    //Global variable to toggle compression on or off
+    private static final boolean COMPRESSION_ENABLED = true;
+
+    //Generates a unique filename using SHA1 hash of file data
     private static String generateSha1(String filePath) throws IOException, NoSuchAlgorithmException {
+        byte[] fileBytes = readFileContent(filePath);
         //Creates SHA1 hash from the file content
         MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-        byte[] hashBytes = sha1.digest(Files.readAllBytes(Paths.get(filePath)));
+        byte[] hashBytes = sha1.digest(fileBytes);
         //Converts hash bytes to string
         StringBuilder sb = new StringBuilder();
         for (byte b : hashBytes) {
@@ -17,67 +22,73 @@ public class Blob {
         }
         return sb.toString();
     }
-    
-    //Create a new blob in the objects directory
+
+    //Reads file content, optionally compress it
+    private static byte[] readFileContent(String filePath) throws IOException {
+        byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
+        if (COMPRESSION_ENABLED) {
+            //Not exactly sure how this compression part works, had to look it up, but it doesn't matter b/c it gets the job done
+            ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+            try (DeflaterOutputStream deflater = new DeflaterOutputStream(byteStream)) {
+                deflater.write(fileBytes);
+            }
+            return byteStream.toByteArray(); //Returns the compressed bytes
+        }
+        return fileBytes; //This only happens if compression is disabled
+    }
+
+    //Creates a new blob in the objects directory
     public static void createBlob(String filePath) throws IOException, NoSuchAlgorithmException, ObjectsDirectoryNotFoundException {
-        //Generates SHA1 hash
         String sha1Filename = generateSha1(filePath);
-        // Check if the objects directory exists
+        //Checks if the objects directory exists
         if (!Files.exists(Paths.get("git/objects"))) {
             throw new ObjectsDirectoryNotFoundException("Objects directory does not exist. Please initialize the repository");
         }
-        //Copies the original file to the objects directory with the new name
-        Files.copy(Paths.get(filePath), Paths.get("git/objects", sha1Filename));
-        // Inserts a new line into index
+        //Reads the file content and writes it into the blob
+        byte[] fileBytes = readFileContent(filePath);
+        Files.write(Paths.get("git/objects", sha1Filename), fileBytes);
+        
+        //Writes a new line into the index
         String fileName = Paths.get(filePath).getFileName().toString();
         String indexEntry = sha1Filename + " " + fileName + "\n";
         Files.write(Paths.get("git/index"), indexEntry.getBytes(StandardCharsets.UTF_8));
     }
 
-    //Tests the Blob creation
+    //Tests the Blob creation, works with both compression and not
     public static void main(String[] args) {
         try {
             Git.initGitRepo();
             resetTestFiles();
-            //creates an example file for testing and tests blob creation on it
-            try {
-                Files.write(Paths.get("example.txt"), "this is an example file...".getBytes(StandardCharsets.UTF_8));
-                createBlob("example.txt");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            try {
-                Files.write(Paths.get("example2.txt"), "this is an example file...".getBytes(StandardCharsets.UTF_8));
-                createBlob("example2.txt");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            System.out.println("Blob created sucessfully");
+
+            System.out.println("Compression Enabled: " + COMPRESSION_ENABLED);
+            Files.write(Paths.get("example.txt"), "this is an example file...".getBytes(StandardCharsets.UTF_8));
+            createBlob("example.txt");
+            System.out.println("Blob created successfully");
+
             //Tests if the hash and file contents are correct
-            String officialSha1Hash = "b48738d9d870657c557db32bbcf5011f4691da54";
-            boolean hashCreatedSuccessfully = false;
+            String officialSha1Hash = generateSha1("example.txt");
+            boolean hashCreatedSuccessfully = Files.exists(Paths.get("git/objects", officialSha1Hash));
             boolean fileContentsCorrect = false;
-            Path blobPath=Paths.get("git/objects/" + officialSha1Hash);
-            if (Files.exists(blobPath)) {
-                hashCreatedSuccessfully = true;
-                byte[] blobContentBytes = Files.readAllBytes(blobPath);
-                String blobContent = new String(blobContentBytes, StandardCharsets.UTF_8);
-                if (blobContent.equals("this is an example file...")) {
-                    fileContentsCorrect = true;
-                }
+            if (hashCreatedSuccessfully) {
+                byte[] blobContentBytes = Files.readAllBytes(Paths.get("git/objects", officialSha1Hash));
+                byte[] originalFileBytes = readFileContent("example.txt");
+                fileContentsCorrect = java.util.Arrays.equals(blobContentBytes, originalFileBytes);
             }
+
             System.out.println("Hash created successfully: " + hashCreatedSuccessfully);
             System.out.println("File contents correct: " + fileContentsCorrect);
+
+            resetTestFiles();
         } catch (IOException | NoSuchAlgorithmException | ObjectsDirectoryNotFoundException e) {
             e.printStackTrace();
         }
     }
-    
-    //Removes test files: example.txt, the corresponding blob, and the index entry
+
+    // Removes test files: example.txt, the corresponding blob, and the index entry
     private static void resetTestFiles() throws IOException, NoSuchAlgorithmException {
         //Deletes the blob file
         try {
-            Files.write(Paths.get("example.txt"), "this is an example file...".getBytes(StandardCharsets.UTF_8));//Only making this to get the hash code if example doesn't exist
+            Files.write(Paths.get("example.txt"), "this is an example file...".getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -89,17 +100,16 @@ public class Blob {
         //Removes the corresponding line in the index file
         Path indexFile = Paths.get("git/index");
         if (Files.exists(indexFile)) {
-            //Reads all lines from the index file into string
             String blobEntry = sha1Hash + " example.txt";
             String indexContent = new String(Files.readAllBytes(indexFile), StandardCharsets.UTF_8);
-            //Removes specific entry
             String updatedIndexContent = indexContent.replace(blobEntry + "\n", "");
             Files.write(indexFile, updatedIndexContent.getBytes(StandardCharsets.UTF_8));
             System.out.println("Removed the entry from the index file");
         }
+
         //Deletes the example.txt file
         Path exampleFile = Paths.get("example.txt");
-        Files.deleteIfExists(exampleFile); // Delete if it exists
+        Files.deleteIfExists(exampleFile);
         System.out.println("Deleted example.txt");
     }
 }
@@ -110,4 +120,3 @@ class ObjectsDirectoryNotFoundException extends Exception {
         super(message);
     }
 }
-

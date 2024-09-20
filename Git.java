@@ -1,7 +1,6 @@
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.charset.StandardCharsets;
 public class Git{
     public static void main (String [] args){
         testRepoInit();
@@ -47,7 +46,7 @@ public class Git{
         //Testing custom already created message
         initGitRepo();
     }
-    
+
     //Checks if a path exists, returns the boolean answer
     private static boolean doesPathExist (String path) {
         return Files.exists(Paths.get(path));
