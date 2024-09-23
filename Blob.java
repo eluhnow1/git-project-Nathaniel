@@ -108,9 +108,14 @@ public class Blob {
 
     // Removes test files: example.txt, the corresponding blob, and the index entry
     private static void resetTestFiles() throws IOException, NoSuchAlgorithmException {
+        //Creates string with 10,000 a's
+        StringBuilder sb = new StringBuilder("");
+        for (int i=0; i<10000; i++) {
+            sb.append("a");
+        }
         //Deletes the blob file
         try {
-            Files.write(Paths.get("example.txt"), "this is an example file...".getBytes(StandardCharsets.UTF_8));
+            Files.write(Paths.get("example.txt"), sb.toString().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             e.printStackTrace();
         }
