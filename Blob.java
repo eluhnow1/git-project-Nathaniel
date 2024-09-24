@@ -8,7 +8,7 @@ import java.util.zip.ZipOutputStream;
 
 public class Blob {
     //Global variable to toggle compression on or off
-    private static final boolean COMPRESSION_ENABLED = true;
+    private static boolean compressionEnabled = true;
 
     //Generates a unique filename using SHA1 hash of file data
     private static String generateSha1(String filePath) throws IOException, NoSuchAlgorithmException {
@@ -27,7 +27,7 @@ public class Blob {
     //Reads file content and compresses it if enabled
     private static byte[] readFileContent(String filePath) throws IOException {
         byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
-        if (COMPRESSION_ENABLED) {
+        if (compressionEnabled) {
             ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); //output stream that writes the input data into a byte array
             try (ZipOutputStream zipper = new ZipOutputStream(byteStream)){
                 zipper.putNextEntry(new ZipEntry(Paths.get(filePath).getFileName().toString()));//Creates a new zip file to be written
@@ -69,7 +69,7 @@ public class Blob {
             for (int i=0; i<10000; i++) {
                 sb.append("a");
             }
-            System.out.println("Compression Enabled: " + COMPRESSION_ENABLED);
+            System.out.println("Compression Enabled: " + compressionEnabled);
             Files.write(Paths.get("example.txt"), sb.toString().getBytes(StandardCharsets.UTF_8));
             createBlob("example.txt");
             System.out.println("Blob created successfully");
@@ -93,7 +93,7 @@ public class Blob {
                 }
             }
             //Tests if compression works
-            if (COMPRESSION_ENABLED) {
+            if (compressionEnabled) {
                 byte[] blobContentBytes = Files.readAllBytes(Paths.get("git/objects", officialSha1Hash));
                 byte[] uncompressedBytes = Files.readAllBytes(Paths.get("example.txt"));
                 System.out.println("Original Size: " + uncompressedBytes.length);
