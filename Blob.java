@@ -3,7 +3,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.zip.DeflaterOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public class Blob {
     //Global variable to toggle compression on or off
@@ -23,13 +24,18 @@ public class Blob {
         return sb.toString();
     }
 
-    //Reads file content, optionally compress it
+    //Reads file content and compresses it if enabled
     private static byte[] readFileContent(String filePath) throws IOException {
         byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
         if (COMPRESSION_ENABLED) {
-            ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); //Creates an output stream that writes the input data into a byte array
-            try (DeflaterOutputStream deflater = new DeflaterOutputStream(byteStream)) {
-                deflater.write(fileBytes); //Compresses a raw stream of bytes using the DEFLATe compression process
+            ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); //output stream that writes the input data into a byte array
+            try (ZipOutputStream zipper = new ZipOutputStream(byteStream)){
+                zipper.putNextEntry(new ZipEntry(Paths.get(filePath).getFileName().toString()));//Creates a new zip file to be written
+                zipper.write(fileBytes); //Writes the original file bytes to the zip entry
+                zipper.closeEntry(); 
+            }
+            catch (IOException e){
+                e.printStackTrace();
             }
             return byteStream.toByteArray(); //Returns the compressed bytes
         }
@@ -81,8 +87,6 @@ public class Blob {
             }
             //Tests if the line in the index file is correctly formatted
             for (String line : Files.readAllLines(Paths.get("git/index"))) {
-                System.out.println("Actual Index Line: " + line);
-                System.out.println("Expected Index Line: " + officialSha1Hash+" example.txt");
                 if (line.equals(officialSha1Hash+" example.txt")) {
                     indexContentCorrect=true;
                     break;
